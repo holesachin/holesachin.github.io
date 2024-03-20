@@ -1,0 +1,58 @@
+
+name: 🚀 Deploy website on push
+on: 
+  push:
+    branches:
+      - main
+
+# Allow this job to clone the repo and create a page deployment
+permissions:
+  contents: read
+  pull-requests: write 
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:                # Job-level permissions configuration starts here
+      contents: write           # 'write' access to repository contents
+      pull-requests: write 
+
+    env:
+      cache-name: cache_nodemods
+
+    steps:
+    - name: 🚚 Get latest code
+      uses: actions/checkout@v4
+
+    - name: Use Node.js 18
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Cache node modules
+      id: cache-nodemodules
+      uses: actions/cache@v2
+      with:
+        path: node_modules
+        key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-build-${{ env.cache-name }}-
+          ${{ runner.os }}-build-
+          ${{ runner.os }}-
+
+    - name: Install Dependencies
+      if: steps.cache-nodemodules.outputs.cache-hit != 'true'
+      run: npm ci
+
+    - name: 🔨 Build Project
+      run: |
+        npm run build
+
+    - name: Push
+      uses: s0/git-publish-subdir-action@develop
+      env:
+        REPO: self
+        BRANCH: sx
+        FOLDER: dist
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # GitHub will automatically add this - you don't need to bother getting a token
+        MESSAGE: "Build: ({sha}) {msg}" # The commit message
